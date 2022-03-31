@@ -179,14 +179,14 @@ def lowerbound(X, T, N, M, alpha, prior_mean, prior_cov, a_0, b_0,\
     # Eq[log p(X)
     lpx = np.sum(phi*likx)
     elbo += lpx
-    
+
     return elbo
 
 
-def compute_test_perplexity(y, phi, mean_mu, cov_mu, a_tao, b_tao, alpha):
+def compute_test_likelihood(y, phi, mean_mu, cov_mu, a_tao, b_tao, alpha):
     N, M = y.shape
     T = phi.shape[0]
-    
+
     suff = np.zeros((T, N))
     for t in range(T):
         suff[t] = np.sum((y - mean_mu[t])**2, axis=1) + np.trace(cov_mu[t])
@@ -202,9 +202,9 @@ def compute_test_perplexity(y, phi, mean_mu, cov_mu, a_tao, b_tao, alpha):
     # Compute phi_y
     phi_y = log_normalize(s, axis=0)
 
-    # Return log(perplexity)
+    # Return test_likelihood / N
     lik = np.sum(phi_y*liky) - np.sum(np.log(phi_y)*phi_y)
-    return -lik/N
+    return lik/N
 
 
 def log_normalize(v, axis=0):
