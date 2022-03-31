@@ -1,4 +1,3 @@
-from sklearn.datasets import make_blobs
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import seaborn as sns
@@ -6,7 +5,8 @@ import numpy as np
 from HPP_CVI_DPMM import HPP_DPMM
 from MHPP_CVI_DPMM import MHPP_DPMM
 from CVI_for_DPMM import CV_DPMM
-from Auxiliary_functions_for_TFCVI import compute_test_perplexity
+from Auxiliary_functions import compute_test_likelihood
+from Synth_drift_generator import drift_generator_2D
 import time
 
 # Use numbers 1 to n for the nonempty clusters so that there is no confusion
@@ -21,35 +21,11 @@ def eigsorted(cov):
     order = vals.argsort()[::-1]
     return vals[order], vecs[:,order]
 
-n_samples = 1000
-n_test_samples = 200
-n_steps = 50
 colors = sns.color_palette("Paired", n_colors=100)
-X = np.zeros((n_steps, n_samples, 2))
-test_data = np.zeros((n_steps, n_test_samples, 2))
+n_batches=30
 
-
-# Create batches
-np.random.seed(999)
-center_var = np.random.uniform(-.4, .4, (n_steps, 4, 2))
-std_var = np.random.uniform(-.15, .15, (n_steps, 4))
-
-for i in range(n_steps):
-    X[i] = make_blobs(n_samples=n_samples,
-                      cluster_std=[.15, .15, .15, .15] + std_var[i],
-                      n_features=2,
-                      centers=[(1.5, 1.5),
-                                (-1, 1),
-                                (-.5, -1),
-                                (1, -.5)] + center_var[i])[0]
-    test_data[i] = make_blobs(n_samples=n_test_samples,
-                      cluster_std=[.15, .15, .15, .15] + std_var[i],
-                      n_features=2,
-                      centers=[(1.5, 1.5),
-                                (-1, 1),
-                                (-.5, -1),
-                                (1, -.5)] + center_var[i])[0]
-
+X, test_data =  drift_generator_2D(n_samples=1000, n_test_samples=200,\
+                                   n_batches=n_batches, n_stationary_batches=15, random_seed=999)
 
 start = time.time()
 
@@ -77,20 +53,21 @@ params_2, clusters, N_t, iteration, log_lik, cluster_centers, cluster_covs = MHP
 
 # Compute and plot perplexity
 
-perp = np.zeros((3, n_steps))
-for i in range(n_steps):
-    perp[0][i] = compute_test_perplexity(test_data[i], params[i][4], params[i][0], params[i][1], params[i][2], params[i][3], 2)
-    perp[1][i] = compute_test_perplexity(test_data[i], params_1[i][4], params_1[i][0], params_1[i][1], params_1[i][2], params_1[i][3], 2)
-    perp[2][i] = compute_test_perplexity(test_data[i], params_2[i][4], params_2[i][0], params_2[i][1], params_2[i][2], params_2[i][3], 2)
+perp = np.zeros((3, n_batches))
+for i in range(n_batches):
+    perp[0][i] = compute_test_likelihood(test_data[i], params[i][4], params[i][0], params[i][1], params[i][2], params[i][3], 2)
+    perp[1][i] = compute_test_likelihood(test_data[i], params_1[i][4], params_1[i][0], params_1[i][1], params_1[i][2], params_1[i][3], 2)
+    perp[2][i] = compute_test_likelihood(test_data[i], params_2[i][4], params_2[i][0], params_2[i][1], params_2[i][2], params_2[i][3], 2)
 
 
 fig, ax1 = plt.subplots(1, 1, figsize=(12, 6))
-ax1.plot(perp[0], 'rx-', linewidth=4, label='HPP-DPM')
-ax1.plot(perp[1], 'bx--', linewidth=4, label='SVB-DPM')
+ax1.plot(perp[0], 'rx-', linewidth=4, label='SVB-DPM')
+ax1.plot(perp[1], 'bx--', linewidth=4, label='HPP-DPM')
 ax1.plot(perp[2], 'gx-', linewidth=4, label='MHPP-DPM')
+plt.locator_params(axis="x", integer=True, tight=True)
 ax1.legend(frameon=False, fontsize=17)
 plt.xlabel('Batch nº', fontsize=18)
-plt.ylabel('log(perplexity)', fontsize=18)
+plt.ylabel('test-likelihood/N', fontsize=18)
 plt.show()
 
 fig.savefig('synth.pdf', format='pdf', bbox_inches='tight')
